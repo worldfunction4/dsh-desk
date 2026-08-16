@@ -1,0 +1,51 @@
+# ── 敏感数据（铁律：任何 commit 不得包含） ──
+DEEPSEEK_API_KEY.yaml
+*.credentials.yaml
+.credentials.yaml
+
+# ── 内部文件（决策记录 / 回归脚本 / 开发文档，不入库） ──
+notes/
+scripts/
+tests/
+CLAUDE.md
+GUIDE.md
+prompt.md
+pytest.ini
+requirements.txt
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+*.spec
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── 虚拟环境 ──
+.venv/
+venv/
+env/
+
+# ── 构建产物 ──
+build/
+cpp/build/
+cpp/build-debug/
+cpp/.vs/
+cpp/.qtcreator/
+out/
+*.user
+
+# ── 诊断 / 临时 / 截图 ──
+.repro/
+.skill-tests/
+timing-tmp/
+screenshots/
+*.log
+
+# ── IDE / 编辑器 ──
+# 注意：cpp/.vscode/（CMake Tools 与运行配置）刻意入库共享，勿忽略。
+.idea/
+*.swp

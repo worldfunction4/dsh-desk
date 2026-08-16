@@ -1,0 +1,8 @@
+{
+  "cmake.configureOnOpen": true,
+  "cmake.parallelJobs": 1,
+  "cmake.configureOnEdit": true,
+  "terminal.integrated.env.windows": {
+    "PATH": "C:\\Qt\\6.11.1\\msvc2022_64\\bin;${env:PATH}"
+  }
+}

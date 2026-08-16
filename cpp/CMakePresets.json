@@ -1,0 +1,41 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "msvc2022-release",
+      "displayName": "MSVC 2022 x64 Release",
+      "description": "本机工具链（notes/03）：VS 2022 14.44 + Qt 6.11.1 msvc2022_64",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.11.1/msvc2022_64"
+      }
+    },
+    {
+      "name": "msvc2022-debug",
+      "displayName": "MSVC 2022 x64 Debug",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build-debug",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.11.1/msvc2022_64"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "msvc2022-release",
+      "configurePreset": "msvc2022-release",
+      "configuration": "Release",
+      "jobs": 1
+    },
+    {
+      "name": "msvc2022-debug",
+      "configurePreset": "msvc2022-debug",
+      "configuration": "Debug",
+      "jobs": 1
+    }
+  ]
+}

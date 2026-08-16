@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "运行 dsh-desk（调试）",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${command:cmake.launchTargetPath}",
+      "args": ["--dsh-root", "${env:DSH_DESK_DSH_ROOT}", "--render", "auto"],
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        { "name": "PATH", "value": "C:\\Qt\\6.11.1\\msvc2022_64\\bin;${env:PATH}" }
+      ]
+    },
+    {
+      "name": "运行 dsh-desk（不带调试）",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${command:cmake.launchTargetPath}",
+      "args": ["--dsh-root", "${env:DSH_DESK_DSH_ROOT}", "--render", "auto"],
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        { "name": "PATH", "value": "C:\\Qt\\6.11.1\\msvc2022_64\\bin;${env:PATH}" }
+      ],
+      "stopAtEntry": false
+    }
+  ]
+}
