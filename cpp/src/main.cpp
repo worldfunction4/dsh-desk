@@ -127,8 +127,13 @@ void installFileLogger(const QString &path) {
     if (path.isEmpty()) {
         return;
     }
-    g_logFile = _wfopen(reinterpret_cast<const wchar_t *>(path.utf16()), L"w");
-    qInstallMessageHandler(fileMessageHandler);
+    FILE *handle = nullptr;
+    // _wfopen_s（_wfopen 触发 MSVC C4996 弃用警告；打开失败则保持 stderr-only）。
+    if (_wfopen_s(&handle, reinterpret_cast<const wchar_t *>(path.utf16()), L"w") == 0
+        && handle != nullptr) {
+        g_logFile = handle;
+        qInstallMessageHandler(fileMessageHandler);
+    }
 }
 
 // WIN32 子系统下：管道启动（验收/CI 场景）时 stdout/stderr 句柄有效，
