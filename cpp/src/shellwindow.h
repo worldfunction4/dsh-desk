@@ -27,6 +27,7 @@ protected:
 private slots:
     void onReady(const QString &url);
     void onFailed(DshProcess::FailReason reason, const QString &message);
+    void onServiceDied(int exitCode);  // 就绪后服务进程退出（正常关停不触发）
 
 private:
     void showStatusPage(const QString &title, const QString &body,

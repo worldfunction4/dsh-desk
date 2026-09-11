@@ -205,7 +205,10 @@ int runScreenshotMode(QApplication &app, DshProcess *dsh, const QString &shotPat
                       const QString &edgeShotPath) {
     ShellWindow window(dsh);
     window.show();
-    dsh->start();
+    // 必须先连接信号再 start()：start() 内的同步失败路径（坏 --launcher、
+    // 端口预检、无 node）会同步 emit failed；若 start 后才 connect，信号
+    // 丢失 → 验收模式卡死在 app.exec()（与 selftest.cpp waitTerminal 的
+    // "先查已定终态再连接"是同一教训）。
     QElapsedTimer elapsed;
     elapsed.start();
 
@@ -216,6 +219,22 @@ int runScreenshotMode(QApplication &app, DshProcess *dsh, const QString &shotPat
     };
     QObject::connect(dsh, &DshProcess::failed, &app,
                      [&](DshProcess::FailReason, const QString &message) { fail(message); });
+    // 服务就绪后在验收期间退出 → 判 FAIL（此前对服务死亡零反馈，产出
+    // saved=1/rc=0 的假阳性指标，实测确认后修正）。
+    QObject::connect(dsh, &DshProcess::serviceDied, &app, [&](int exitCode) {
+        fail(QStringLiteral("服务在验收期间退出（退出码 %1）").arg(exitCode));
+    });
+
+    dsh->start();
+
+    // start() 内的同步失败路径（坏 --launcher / 端口预检拒绝 / 无 node）
+    // 在事件循环起来之前就同步 emit failed：上面的 connect 已打印
+    // SHELL_METRICS_FAIL 并 close 窗口，但 exec() 之前的 app.exit() 在
+    // Qt6 实测不生效（坏 --launcher 场景挂死 5 分钟不退出，真机复现）。
+    // 因此这里必须直接查已定终态，同步返回，绝不进入 app.exec()。
+    if (dsh->failReason() != DshProcess::FailReason::None) {
+        return 2;
+    }
 
     QObject::connect(dsh, &DshProcess::ready, &window, [&](const QString &url) {
         QWebEngineView *view = window.view();

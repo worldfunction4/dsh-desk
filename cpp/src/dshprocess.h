@@ -73,6 +73,9 @@ public:
 signals:
     void ready(const QString &url);                       // 就绪（url 为官方本地地址）
     void failed(DshProcess::FailReason reason, const QString &message);
+    // 就绪后子进程退出（服务死亡）。正常 stop() 关停不发射；壳据此提示
+    // 用户"服务已断开"（就绪前退出仍走 failed，终态语义不变）。
+    void serviceDied(int exitCode);
 
 private slots:
     void onStdout();
@@ -115,6 +118,7 @@ private:
     QString m_pendingLine;   // 分块读取时的残行
     int m_httpStreak = 0;    // HTTP 200 连续命中计数（≥3 判定）
     bool m_finished = false;
+    bool m_stopping = false;  // stop() 进行中：进程退出属正常关停，不发 serviceDied
 
 #ifdef Q_OS_WIN
     // kill-on-close Job：壳无论正常退出还是崩溃，Windows 都会终结整棵

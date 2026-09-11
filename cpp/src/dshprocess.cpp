@@ -299,9 +299,17 @@ void DshProcess::onProcessFinished(int code, QProcess::ExitStatus /*status*/) {
         m_pendingLine.clear();
     }
     // 尚未就绪即退出 → 失败（就绪前退出是启动失败，不是正常关停）。
-    if (m_readySignal == ReadySignal::None && m_failReason == FailReason::None) {
-        markFailed(FailReason::ProcessExited,
-                   QStringLiteral("dsh web 在就绪前退出（退出码 %1）").arg(code));
+    if (m_readySignal == ReadySignal::None) {
+        if (m_failReason == FailReason::None) {
+            markFailed(FailReason::ProcessExited,
+                       QStringLiteral("dsh web 在就绪前退出（退出码 %1）").arg(code));
+        }
+        return;
+    }
+    // 就绪后退出：正常 stop() 关停不算事故；其余一律广播服务死亡，
+    // 壳据此显示"服务已断开"状态页（此前对服务死亡零反馈，实测确认后修正）。
+    if (!m_stopping) {
+        emit serviceDied(code);
     }
 }
 
@@ -376,6 +384,7 @@ void DshProcess::stop(int waitMs) {
     if (m_process.state() == QProcess::NotRunning) {
         return;
     }
+    m_stopping = true;  // 之后的进程退出属正常关停，不广播 serviceDied
     const qint64 pid = m_process.processId();
     qInfo().noquote() << QStringLiteral("[STOP] pid=%1 state=%2").arg(pid).arg(int(m_process.state()));
     // Windows：pnpm 树是多层进程，仅终止直接子进程会残留 node。

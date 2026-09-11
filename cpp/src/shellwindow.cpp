@@ -63,6 +63,7 @@ ShellWindow::ShellWindow(DshProcess *dsh, QWidget *parent)
 
     connect(m_dsh, &DshProcess::ready, this, &ShellWindow::onReady);
     connect(m_dsh, &DshProcess::failed, this, &ShellWindow::onFailed);
+    connect(m_dsh, &DshProcess::serviceDied, this, &ShellWindow::onServiceDied);
 
     // 启动状态页：就绪前显示等待提示（端口由 OS 分配时不可预知，故不显示）。
     showStatusPage(QStringLiteral("正在启动 dsh web"),
@@ -81,6 +82,14 @@ void ShellWindow::onFailed(DshProcess::FailReason /*reason*/, const QString &mes
     showStatusPage(
         QStringLiteral("dsh web 启动失败"),
         QStringLiteral("%1<br>请确认 dsh checkout 可用（%2）。").arg(message, m_dsh->dshRoot()));
+}
+
+void ShellWindow::onServiceDied(int exitCode) {
+    // 就绪后服务进程退出（正常关停走 closeEvent→stop，不经过这里）。
+    showStatusPage(
+        QStringLiteral("dsh web 服务已断开"),
+        QStringLiteral("本地服务进程已退出（退出码 %1）。<br>"
+                       "请关闭窗口后重新启动 dsh-desk。").arg(exitCode));
 }
 
 void ShellWindow::showStatusPage(const QString &title, const QString &body, bool progress) {
