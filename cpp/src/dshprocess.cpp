@@ -229,7 +229,12 @@ void DshProcess::start() {
     QStringList args = spec.prefix;
     args << QStringLiteral("web")
          << QStringLiteral("--host") << m_host
-         << QStringLiteral("--port") << QString::number(m_port);
+         << QStringLiteral("--port") << QString::number(m_port)
+         // 0.1.5-rc.2 契约变化（2026-09-11 真机实测）：`dsh web` 默认会
+         // 打开系统默认浏览器（官方 --help："do not open the Web UI in
+         // the default browser"）。壳内已有 WebEngine 视图，浏览器再开
+         // 一份既冗余又破坏"桌面化"体验，故显式 --no-open。
+         << QStringLiteral("--no-open");
     m_process.start(spec.program, args);
 
     if (!m_process.waitForStarted(10000)) {
@@ -276,12 +281,14 @@ void DshProcess::onStdout() {
         const auto match = kUrlLineRe.match(line);
         if (match.hasMatch() && m_readySignal == ReadySignal::None) {
             m_url = match.captured(1);
-            // --port 0 时 OS 分配的实际端口从官方 URL 行解析（url 形如
-            // http://127.0.0.1:<实际端口>）；显式端口时两者一致。
-            const QRegularExpression portRe(QStringLiteral(":(\\d+)$"));
-            const auto portMatch = portRe.match(m_url);
-            if (portMatch.hasMatch()) {
-                m_boundPort = quint16(portMatch.captured(1).toUInt());
+            // --port 0 时 OS 分配的实际端口从官方 URL 行解析；显式端口时
+            // 两者一致。0.1.5-rc.2 契约变化（2026-09-11 真机实测）：URL 带
+            // 访问 token 查询串（http://127.0.0.1:<port>/?token=...），旧的
+            // `:(\d+)$` 行尾锚定正则失配 → boundPort 恒 0。改用 QUrl 从
+            // authority 段提取端口，对有无查询串两种格式都稳健。
+            const QUrl parsed(m_url);
+            if (parsed.port() > 0) {
+                m_boundPort = quint16(parsed.port());
             }
             markReady(ReadySignal::UrlLine);
             return;
