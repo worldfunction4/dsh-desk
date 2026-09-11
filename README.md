@@ -80,7 +80,7 @@ build\Release\dsh-desk.exe --dsh-root D:\path\to\deepseek-harness --selftest
 | `--host <host>` | `127.0.0.1` | 绑定主机。**官方红线：禁止 `0.0.0.0`**（会被 dsh 拒绝） |
 | `--port <port>` | `0` | `0` = OS 分配空闲端口；或 `1–65535` 显式指定（被占用会报错退出，不静默） |
 | `--timeout <ms>` | `180000` | 就绪等待上限。直启构建产物实测约 9 秒；pnpm/tsx 回退链路约 100 秒 |
-| `--launcher <path>` | 自动探测 | 覆盖 dsh 启动入口；默认直启 `apps/cli/lib/bin.js`，缺失时回退 pnpm |
+| `--launcher <path>` | 自动探测 | 显式指定时**优先于一切默认探测**（直启 lib/bin.js 亦被覆盖）；默认未指定时直启 `apps/cli/lib/bin.js`，缺失时回退 pnpm |
 | `--render <mode>` | `auto` | `auto` / `software`（强制软件渲染，GPU 异常导致闪烁/卡顿时用）/ `hardware`（强制 ANGLE D3D11） |
 | `--selftest` | — | 运行内嵌回归断言后退出 |
 | `--screenshot <path>` | — | 验收模式：渲染完成后截图并输出指标后退出 |

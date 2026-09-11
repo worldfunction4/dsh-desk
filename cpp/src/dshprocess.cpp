@@ -135,7 +135,37 @@ DshProcess::LaunchSpec DshProcess::buildLaunchSpec() const {
         return {};  // 无 node：下面统一报错
     }
 
-    // 首选：构建产物直启（m_dshRoot/apps/cli/lib/bin.js，CLI 入口直接收 `web`）。
+    // 显式 `--launcher` 优先于一切默认探测（README 承诺的"覆盖"语义；
+    // 此前 lib/bin.js 存在时它被静默忽略，实测确认后修正）。
+    if (!m_launcher.isEmpty()) {
+        // .cmd/.bat shim：若其同目录有 pnpm 的 pnpm.mjs，改由 node 直启
+        // pnpm.mjs（绕过 cmd 包装层，见下方"实测教训"）；否则原样启动
+        //（此时 cmd 包装层孤儿风险由 Job Object 防线兜底）。
+        if (m_launcher.endsWith(QLatin1String(".cmd"), Qt::CaseInsensitive)
+            || m_launcher.endsWith(QLatin1String(".bat"), Qt::CaseInsensitive)) {
+            const QFileInfo shim(m_launcher);
+            const QString pnpmMjs = shim.dir().filePath(
+                QStringLiteral("node_modules/pnpm/bin/pnpm.mjs"));
+            if (QFileInfo::exists(pnpmMjs)) {
+                return {node, {pnpmMjs, QStringLiteral("dsh")}};
+            }
+        }
+        return {m_launcher, {}};
+    }
+
+    // 默认（未显式 --launcher）：构建产物直启（m_dshRoot/apps/cli/lib/bin.js，
+    // CLI 入口直接收 `web`）。理由（均真机实测，同环境对照）：
+    //   - pnpm 链路（`pnpm dsh` → `node --import tsx/esm apps/cli/src/bin.ts`）
+    //     每次启动都经 tsx/esbuild 实时转译 TS 源码，实测就绪 60s+（tsx
+    //     进程满负荷）；直启构建产物实测 8.7s，提速约 7 倍。
+    //   - 直启 = npm 正式安装形态（M3 打包后目标机器没有 pnpm/tsx 也一样跑）。
+    //   - 仍保留 pnpm 回退：checkout 未构建（lib/ 缺失）时退回原链路。
+    //
+    // 实测教训（保留）：直接 QProcess 启动 pnpm.cmd 会引入 cmd.exe 包装层，
+    // 该层可能在 node 树之前退出，导致 QProcess 误判"进程已结束"、taskkill
+    // /T 失去根节点而留下孤儿 node（真机复现：两个残留实例的 cmd 父已死）。
+    // 因此一律直接 spawn `node`：QProcess 持有的是真实存活的 node 根进程，
+    // 其存活期与 dsh web 一致，taskkill /T 树清理可靠。
     const QString libBin = m_dshRoot + QStringLiteral("/apps/cli/lib/bin.js");
     if (QFileInfo::exists(libBin)) {
         return {node, {libBin}};
