@@ -210,6 +210,17 @@ QProcessEnvironment isolatedEnv(const QString &dshHome) {
     return env;
 }
 
+// 失败诊断：取子进程日志尾部几行（上游启动失败的原因如"缺包"一眼可见）。
+// 哨兵值做防御性替换，保证诊断输出本身不泄漏注入的 key。
+QString logTail(const DshProcess &dsh) {
+    QStringList tail;
+    const QStringList lines = dsh.logLines();
+    for (int i = qMax(0, lines.size() - 5); i < lines.size(); ++i) {
+        tail << QString(lines.at(i)).replace(kSentinel, QStringLiteral("***"));
+    }
+    return tail.join(QStringLiteral(" ┃ "));
+}
+
 }  // namespace
 
 // 解析 pnpm 启动器（.cmd shim 路径），供 pnpm 回退链路用例使用。
@@ -275,11 +286,18 @@ int runSelfTest(QCoreApplication & /*app*/, const QString &dshRoot, const QStrin
 
         report.check(terminal.ready, QStringLiteral("1a 就绪（官方信号）"),
                      terminal.ready ? dsh.url()
-                                    : QStringLiteral("reason=%1").arg(int(terminal.fail)));
+                                    : QStringLiteral("reason=%1 | tail=%2")
+                                          .arg(int(terminal.fail))
+                                          .arg(logTail(dsh)));
         report.check(dsh.readySignal() == DshProcess::ReadySignal::UrlLine,
                      QStringLiteral("1b 主信号=官方 URL 行"),
                      QStringLiteral("signal=%1").arg(int(dsh.readySignal())));
-        report.check(dsh.url() == QStringLiteral("http://127.0.0.1:%1").arg(port),
+        // 0.1.5-rc.2 起 URL 带访问 token 查询串（http://127.0.0.1:<port>/?token=...），
+        // 精确相等断言不再成立；改为结构化比较 scheme/host/port（契约不变部分）。
+        const QUrl parsedUrl(dsh.url());
+        report.check(parsedUrl.scheme() == QStringLiteral("http")
+                         && parsedUrl.host() == QStringLiteral("127.0.0.1")
+                         && parsedUrl.port() == port,
                      QStringLiteral("1c URL 端口匹配"), dsh.url());
         report.check(httpStatus(dsh.url()) == 200, QStringLiteral("1d HTTP 200"), dsh.url());
 
@@ -347,7 +365,9 @@ int runSelfTest(QCoreApplication & /*app*/, const QString &dshRoot, const QStrin
         const Terminal terminal = waitTerminal(dsh, 200000);
         report.check(!terminal.ready && terminal.fail == DshProcess::FailReason::ProcessExited,
                      QStringLiteral("3a 端口冲突→进程退出失败"),
-                     QStringLiteral("ready=%1 fail=%2").arg(terminal.ready).arg(int(terminal.fail)));
+                     QStringLiteral("ready=%1 fail=%2 | tail=%3").arg(terminal.ready)
+                         .arg(int(terminal.fail))
+                         .arg(logTail(dsh)));
         const qint64 pid = dsh.pid();
         dsh.stop();
         report.check(!dshLeftoverAlive(pid, port), QStringLiteral("3b 冲突路径无残留"));
@@ -362,7 +382,10 @@ int runSelfTest(QCoreApplication & /*app*/, const QString &dshRoot, const QStrin
         dsh.start();
         const Terminal terminal = waitTerminal(dsh, 30000);
         report.check(!terminal.ready && terminal.fail == DshProcess::FailReason::Timeout,
-                     QStringLiteral("4a 极小超时→Timeout 失败"));
+                     QStringLiteral("4a 极小超时→Timeout 失败"),
+                     QStringLiteral("ready=%1 fail=%2 | tail=%3").arg(terminal.ready)
+                         .arg(int(terminal.fail))
+                         .arg(logTail(dsh)));
         const qint64 pid = dsh.pid();
         dsh.stop();
         report.check(!dshLeftoverAlive(pid, port), QStringLiteral("4b 超时路径无残留"));
@@ -387,7 +410,11 @@ int runSelfTest(QCoreApplication & /*app*/, const QString &dshRoot, const QStrin
         dsh.setExtraEnv(isolatedEnv(dshHome));
         dsh.start();
         const Terminal terminal = waitTerminal(dsh, 200000);
-        report.check(terminal.ready, QStringLiteral("6a --port 0 就绪（官方 URL 行）"));
+        report.check(terminal.ready, QStringLiteral("6a --port 0 就绪（官方 URL 行）"),
+                     terminal.ready ? dsh.url()
+                                    : QStringLiteral("reason=%1 | tail=%2")
+                                          .arg(int(terminal.fail))
+                                          .arg(logTail(dsh)));
         report.check(dsh.boundPort() != 0, QStringLiteral("6b OS 实际分配端口非零"),
                      QStringLiteral("bound=%1").arg(dsh.boundPort()));
         bool loopback = false;
@@ -412,8 +439,11 @@ int runSelfTest(QCoreApplication & /*app*/, const QString &dshRoot, const QStrin
             dsh.start();
             const Terminal terminal = waitTerminal(dsh, 200000);
             report.check(terminal.ready, QStringLiteral("7b pnpm 回退链路就绪（--port 0）"),
-                         QStringLiteral("ready=%1 fail=%2").arg(terminal.ready)
-                             .arg(int(terminal.fail)));
+                         terminal.ready ? dsh.url()
+                                        : QStringLiteral("ready=%1 fail=%2 | tail=%3")
+                                              .arg(terminal.ready)
+                                              .arg(int(terminal.fail))
+                                              .arg(logTail(dsh)));
             const qint64 pid = dsh.pid();
             dsh.stop();
             report.check(!dshLeftoverAlive(pid, dsh.boundPort()),
